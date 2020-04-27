@@ -1,7 +1,10 @@
 import numpy as np
 from numpy.linalg import norm
-from ..metrics._structural_similarity import structural_similarity as ssim
 
+from skimage.metrics._structural_similarity import (
+    structural_similarity
+    as ssim
+)
 
 def E(X, Y):
     return (Y - X) / norm(Y - X)
@@ -31,7 +34,7 @@ def get_update(img, adv_x, sigma):
     return update
 
 
-def optimize_func(img, op, _lambda, iters, sigma):
+def optimize_func(img, adv_x, op, _lambda, iters, sigma):
     if len(img.shape) != 3:
         img = img[0]
 
@@ -39,13 +42,18 @@ def optimize_func(img, op, _lambda, iters, sigma):
     Compute the image with the highest or lowest SSIM to a reference image
     on the L-2 ball of the reference image. Follows a two step iterative
     gradient descent procedure.
+    
+    For actual use, the minimize_ssim or maximize_ssim wrapper functions
+    should be used.
 
     Parameters
     ----------
-    minimize: bool
-        If True, image with lowest ssim is found. Else, highest ssim is found
     img: ndarray
         The reference image
+    adv_x: The original corrupted version of img. If None, adv_x
+           is created using random noise
+    op: function
+        The operator used to specify gradient ascent/descent
     _lambda: float
         The L-2 distance from the reference image
     iters: int
@@ -56,7 +64,7 @@ def optimize_func(img, op, _lambda, iters, sigma):
     Returns
     -------
     adv_x: ndarray
-        Optimized image
+        Noisy image with highest/lowest SSIM to reference image
 
     Notes
     ------
@@ -80,8 +88,9 @@ def optimize_func(img, op, _lambda, iters, sigma):
     if np.max(img) > 1.0:
         raise ValueError("Array values should me in range [0, 1]")
 
-    # create initial noisy image
-    adv_x = add_noise(img, _lambda)
+    if adv_x is None:
+        # create initial noisy image
+        adv_x = add_noise(img, _lambda)
 
     # save starting ssim
     prev_ssim = ssim(img, adv_x, multichannel=True)
@@ -132,11 +141,11 @@ def sub(x, y):
     return x - y
 
 
-def minimize_ssim(img, _lambda, iters=50, sigma=30):
-    adv_x = optimize_func(img, sub, _lambda, iters, sigma)
+def minimize_ssim(img, noisy=None, _lambda=8, iters=50, sigma=30):
+    adv_x = optimize_func(img, noisy, sub, _lambda, iters, sigma)
     return adv_x
 
 
-def maximize_ssim(img, _lambda, iters=50, sigma=30):
-    adv_x = optimize_func(img, add, _lambda, iters, sigma)
+def maximize_ssim(img, noisy=None, _lambda=8, iters=50, sigma=30):
+    adv_x = optimize_func(img, noisy, add, _lambda, iters, sigma)
     return adv_x
